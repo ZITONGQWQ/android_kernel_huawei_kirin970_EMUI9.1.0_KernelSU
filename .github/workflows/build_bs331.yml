@@ -10,7 +10,7 @@ jobs:
       KERNEL_CMDLINE: "ARCH=arm64 CROSS_COMPILE=aarch64-linux-android- O=out"
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'true'
         fetch-depth: 100
@@ -75,7 +75,7 @@ jobs:
         ls -l *.img
 
     - name: Upload
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: Kirin970_Ravel_KSU_BS331-${{ steps.get_time.outputs.TIME }}
         path: "Kirin970_Ravel_KSU_BS331-*.img"
