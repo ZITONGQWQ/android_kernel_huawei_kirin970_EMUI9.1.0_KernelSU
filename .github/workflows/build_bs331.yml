@@ -60,9 +60,9 @@ jobs:
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
         export ARCH=arm64
         export SUBARCH=arm64
-        make $KERNEL_CMDLINE Ravel_kirin970_KSU_defconfig
+        make $KERNEL_CMDLINE HOSTCFLAGS="-fcommon -w" Ravel_kirin970_KSU_defconfig
         grep -E 'CONFIG_KSU|CONFIG_SECCOMP=|CONFIG_SECURITY_SELINUX=' out/.config | sort
-        make $KERNEL_CMDLINE -j$(nproc --all)
+        make $KERNEL_CMDLINE HOSTCFLAGS="-fcommon -w" -j$(nproc --all)
 
     - name: Pack boot image
       run: |
