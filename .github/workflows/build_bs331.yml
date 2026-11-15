@@ -55,6 +55,27 @@ jobs:
         echo 'CONFIG_KSU_SHELL_HAS_SU_ALWAYS=y' >> $DC
         tail -8 $DC
 
+    - name: Patch KSU sepolicy for Huawei 4.9 policydb layout
+      run: |
+        python3 - <<'PYEOF'
+        p = 'drivers/kernelsu/selinux/sepolicy.c'
+        s = open(p).read()
+        pairs = [
+          ('#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0) || defined(KSU_TYPE_VAL_TO_STRUCT)\n',
+           '#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0) || defined(KSU_TYPE_VAL_TO_STRUCT)) && !defined(CONFIG_IS_HW_HISI)\n'),
+          ('#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || defined(KSU_TYPE_VAL_TO_STRUCT) || defined(KSU_TYPE_VAL_TO_STRUCT_ARRAY)\n',
+           '#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || defined(KSU_TYPE_VAL_TO_STRUCT) || defined(KSU_TYPE_VAL_TO_STRUCT_ARRAY)) && !defined(CONFIG_IS_HW_HISI)\n'),
+        ]
+        for old, new in pairs:
+            assert old in s, 'pattern not found: ' + old
+            s = s.replace(old, new, 1)
+            print('patched:', old.strip())
+        open(p, 'w').write(s)
+        print('--- result ---')
+        for i, line in enumerate(s.split('\n'), 1):
+            if 'CONFIG_IS_HW_HISI' in line and line.startswith('#'):
+                print(i, line)
+        PYEOF
     - name: Build Kernel
       run: |
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
