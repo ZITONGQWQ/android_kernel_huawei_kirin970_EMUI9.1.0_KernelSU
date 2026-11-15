@@ -55,6 +55,46 @@ jobs:
         echo 'CONFIG_KSU_SHELL_HAS_SU_ALWAYS=y' >> $DC
         tail -8 $DC
 
+    - name: Strip legacy KSU 0.9.5 hook call sites
+      run: |
+        python3 - <<'PYEOF'
+        import re
+        targets = ['fs/exec.c','fs/open.c','fs/read_write.c','fs/stat.c','drivers/input/input.c']
+        comment = re.compile(r'/\*\n\* Add KernelSU symbol\n\*/\n')
+        calls = [
+         (r'\tif \(unlikely\(ksu_execveat_hook\)\)\n\t\tksu_handle_execveat\([^;]*\);\n\telse\n\t\tksu_handle_execveat_sucompat\([^;]*\);\n', 'execveat'),
+         (r'\n\tksu_handle_faccessat\([^;]*\);\n', 'faccessat'),
+         (r'\tif \(unlikely\(ksu_vfs_read_hook\)\)\n\t\tksu_handle_vfs_read\([^;]*\);\n\n', 'vfs_read'),
+         (r'\tksu_handle_stat\([^;]*\);\n', 'stat'),
+         (r'\tif \(unlikely\(ksu_input_hook\)\)\n\t\tksu_handle_input_handle_event\([^;]*\);\n\n', 'input'),
+        ]
+        for f in targets:
+            s = open(f).read()
+            s, _ = comment.subn('', s)
+            lines = s.split('\n')
+            out, i, removed = [], 0, 0
+            while i < len(lines):
+                ln = lines[i]
+                if ln.lstrip().startswith('extern') and 'ksu_' in ln:
+                    removed += 1
+                    while i < len(lines) and ');' not in lines[i]:
+                        i += 1
+                    i += 1
+                    continue
+                out.append(ln); i += 1
+            s = '\n'.join(out)
+            for pat, name in calls:
+                s, n = re.subn(pat, '', s, count=1)
+                removed += n
+            open(f, 'w').write(s)
+            print('patched', f, 'removed', removed)
+        left = 0
+        for f in targets:
+            if 'ksu_' in open(f).read():
+                print('LEFTOVER in', f); left += 1
+        assert left == 0, 'legacy ksu_ references still present'
+        print('--- all legacy ksu_ call sites stripped ---')
+        PYEOF
     - name: Patch KSU sepolicy for Huawei 4.9 policydb layout
       run: |
         python3 - <<'PYEOF'
