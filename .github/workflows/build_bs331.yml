@@ -140,6 +140,17 @@ jobs:
             if 'CONFIG_IS_HW_HISI' in line and line.startswith('#'):
                 print(i, line)
         PYEOF
+    - name: Backport cgroup device BPF (BPF_PROG_TYPE_CGROUP_DEVICE)
+      run: |
+        set -e
+        python3 .github/scripts/ksu_devcg_patch.py
+        echo "--- verification: symbols present ---"
+        grep -c "BPF_PROG_TYPE_CGROUP_DEVICE" include/uapi/linux/bpf.h
+        grep -n "__cgroup_bpf_check_dev_permission" include/linux/bpf-cgroup.h kernel/bpf/cgroup.c | head
+        grep -n "BPF_CGROUP_RUN_PROG_DEVICE_CGROUP" include/linux/bpf-cgroup.h security/device_cgroup.c | head
+        grep -n "case BPF_CGROUP_DEVICE" kernel/bpf/syscall.c
+        grep -n "cg_dev_verifier_ops" kernel/bpf/cgroup.c
+
     - name: Build Kernel
       run: |
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
@@ -151,16 +162,16 @@ jobs:
 
     - name: Pack boot image
       run: |
-        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF3"
+        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF4"
         tools/mkbootimg --kernel out/arch/arm64/boot/Image.gz --base 0x0 \
           --cmdline "$CMDLINE" \
           --tags_offset 0x07A00000 --kernel_offset 0x00080000 --ramdisk_offset 0x07C00000 \
           --header_version 1 --os_version 9 --os_patch_level 2020-01-01 \
-          --output Kirin970_Ravel_KSU_PERF3-${{ steps.get_time.outputs.TIME }}.img
+          --output Kirin970_Ravel_KSU_PERF4-${{ steps.get_time.outputs.TIME }}.img
         ls -l *.img
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: Kirin970_Ravel_KSU_PERF3-${{ steps.get_time.outputs.TIME }}
-        path: "Kirin970_Ravel_KSU_PERF3-*.img"
+        name: Kirin970_Ravel_KSU_PERF4-${{ steps.get_time.outputs.TIME }}
+        path: "Kirin970_Ravel_KSU_PERF4-*.img"
