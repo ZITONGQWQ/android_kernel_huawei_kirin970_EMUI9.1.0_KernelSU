@@ -67,6 +67,14 @@ jobs:
         sed -i 's/^# CONFIG_CRYPTO_ZSTD is not set/CONFIG_CRYPTO_ZSTD=y/' $DC
         grep -q '^CONFIG_CRYPTO_ZSTD=y' $DC || echo 'CONFIG_CRYPTO_ZSTD=y' >> $DC
         grep -q '^CONFIG_KSM=y' $DC || echo 'CONFIG_KSM=y' >> $DC
+
+          # ---- Android 12+ kernel capability (BPF JIT / device cgroup) ----
+          sed -i 's/^# CONFIG_BPF_JIT is not set/CONFIG_BPF_JIT=y/' $DC
+          grep -q '^CONFIG_BPF_JIT=y' $DC || echo 'CONFIG_BPF_JIT=y' >> $DC
+          sed -i 's/^# CONFIG_CGROUP_DEVICE is not set/CONFIG_CGROUP_DEVICE=y/' $DC
+          grep -q '^CONFIG_CGROUP_DEVICE=y' $DC || echo 'CONFIG_CGROUP_DEVICE=y' >> $DC
+          sed -i 's/^# CONFIG_BPF_JIT_ALWAYS_ON is not set/CONFIG_BPF_JIT_ALWAYS_ON=y/' $DC
+          grep -E 'BPF_JIT|CGROUP_DEVICE|CGROUP_BPF' $DC
         echo '--- verify ---'
         grep -E 'TCP_CONG_BBR|DEFAULT_TCP_CONG|NET_SCH_FQ|CRYPTO_ZSTD|^CONFIG_KSM' $DC
         tail -12 $DC
@@ -143,16 +151,16 @@ jobs:
 
     - name: Pack boot image
       run: |
-        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF2"
+        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF3"
         tools/mkbootimg --kernel out/arch/arm64/boot/Image.gz --base 0x0 \
           --cmdline "$CMDLINE" \
           --tags_offset 0x07A00000 --kernel_offset 0x00080000 --ramdisk_offset 0x07C00000 \
           --header_version 1 --os_version 9 --os_patch_level 2020-01-01 \
-          --output Kirin970_Ravel_KSU_PERF2-${{ steps.get_time.outputs.TIME }}.img
+          --output Kirin970_Ravel_KSU_PERF3-${{ steps.get_time.outputs.TIME }}.img
         ls -l *.img
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: Kirin970_Ravel_KSU_PERF2-${{ steps.get_time.outputs.TIME }}
-        path: "Kirin970_Ravel_KSU_PERF2-*.img"
+        name: Kirin970_Ravel_KSU_PERF3-${{ steps.get_time.outputs.TIME }}
+        path: "Kirin970_Ravel_KSU_PERF3-*.img"
