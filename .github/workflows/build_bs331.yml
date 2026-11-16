@@ -153,6 +153,11 @@ jobs:
         grep -n 'CRYPTO_LZ4KD' crypto/Kconfig crypto/Makefile
         grep -n 'lz4kd' lib/Makefile drivers/block/zram/zcomp.c
         ls -l lib/lz4kd/ include/linux/lz4kdr.h crypto/lz4kd.c
+    - name: Fix kbase 2MB_ALLOC pointer typo
+      run: |
+        set -e
+        python3 .github/scripts/fix_kbase_2mb.py
+        grep -n 'pool->order' drivers/gpu/arm/bifrost-r14p0-00cet0/mali_kbase_mmu.c
     - name: Build Kernel
       run: |
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
@@ -164,16 +169,16 @@ jobs:
 
     - name: Pack boot image
       run: |
-        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF7"
+        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF8"
         tools/mkbootimg --kernel out/arch/arm64/boot/Image.gz --base 0x0 \
           --cmdline "$CMDLINE" \
           --tags_offset 0x07A00000 --kernel_offset 0x00080000 --ramdisk_offset 0x07C00000 \
           --header_version 1 --os_version 9 --os_patch_level 2020-01-01 \
-          --output Kirin970_Ravel_KSU_PERF7-${{ steps.get_time.outputs.TIME }}.img
+          --output Kirin970_Ravel_KSU_PERF8-${{ steps.get_time.outputs.TIME }}.img
         ls -l *.img
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: Kirin970_Ravel_KSU_PERF7-${{ steps.get_time.outputs.TIME }}
-        path: "Kirin970_Ravel_KSU_PERF7-*.img"
+        name: Kirin970_Ravel_KSU_PERF8-${{ steps.get_time.outputs.TIME }}
+        path: "Kirin970_Ravel_KSU_PERF8-*.img"
