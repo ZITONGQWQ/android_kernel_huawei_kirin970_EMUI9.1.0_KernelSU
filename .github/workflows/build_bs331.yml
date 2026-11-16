@@ -67,14 +67,20 @@ jobs:
         sed -i 's/^# CONFIG_CRYPTO_ZSTD is not set/CONFIG_CRYPTO_ZSTD=y/' $DC
         grep -q '^CONFIG_CRYPTO_ZSTD=y' $DC || echo 'CONFIG_CRYPTO_ZSTD=y' >> $DC
         grep -q '^CONFIG_KSM=y' $DC || echo 'CONFIG_KSM=y' >> $DC
-
-          # ---- Android 12+ kernel capability (BPF JIT / device cgroup) ----
-          sed -i 's/^# CONFIG_BPF_JIT is not set/CONFIG_BPF_JIT=y/' $DC
-          grep -q '^CONFIG_BPF_JIT=y' $DC || echo 'CONFIG_BPF_JIT=y' >> $DC
-          sed -i 's/^# CONFIG_CGROUP_DEVICE is not set/CONFIG_CGROUP_DEVICE=y/' $DC
-          grep -q '^CONFIG_CGROUP_DEVICE=y' $DC || echo 'CONFIG_CGROUP_DEVICE=y' >> $DC
-          sed -i 's/^# CONFIG_BPF_JIT_ALWAYS_ON is not set/CONFIG_BPF_JIT_ALWAYS_ON=y/' $DC
-          grep -E 'BPF_JIT|CGROUP_DEVICE|CGROUP_BPF' $DC
+        echo '--- perf5: JUMP_LABEL / HZ1000 / LZ4HC / 842 ---'
+        sed -i 's/^# CONFIG_JUMP_LABEL is not set/CONFIG_JUMP_LABEL=y/' $DC
+        grep -q '^CONFIG_JUMP_LABEL=y' $DC || echo 'CONFIG_JUMP_LABEL=y' >> $DC
+        sed -i 's/^CONFIG_HZ_250=y/# CONFIG_HZ_250 is not set/' $DC
+        sed -i 's/^# CONFIG_HZ_1000 is not set/CONFIG_HZ_1000=y/' $DC
+        grep -q '^CONFIG_HZ_1000=y' $DC || echo 'CONFIG_HZ_1000=y' >> $DC
+        sed -i 's/^CONFIG_HZ=250/CONFIG_HZ=1000/' $DC
+        sed -i 's/^# CONFIG_CRYPTO_LZ4HC is not set/CONFIG_CRYPTO_LZ4HC=y/' $DC
+        grep -q '^CONFIG_CRYPTO_LZ4HC=y' $DC || echo 'CONFIG_CRYPTO_LZ4HC=y' >> $DC
+        sed -i 's/^# CONFIG_CRYPTO_842 is not set/CONFIG_CRYPTO_842=y/' $DC
+        grep -q '^CONFIG_CRYPTO_842=y' $DC || echo 'CONFIG_CRYPTO_842=y' >> $DC
+        sed -i 's/^CONFIG_DEBUG_INFO=y/# CONFIG_DEBUG_INFO is not set/' $DC
+        echo '--- verify perf5 ---'
+        grep -E 'CONFIG_JUMP_LABEL|CONFIG_HZ|CONFIG_CRYPTO_LZ4HC|CONFIG_CRYPTO_842|CONFIG_DEBUG_INFO=' $DC
         echo '--- verify ---'
         grep -E 'TCP_CONG_BBR|DEFAULT_TCP_CONG|NET_SCH_FQ|CRYPTO_ZSTD|^CONFIG_KSM' $DC
         tail -12 $DC
@@ -140,17 +146,6 @@ jobs:
             if 'CONFIG_IS_HW_HISI' in line and line.startswith('#'):
                 print(i, line)
         PYEOF
-    - name: Backport cgroup device BPF (BPF_PROG_TYPE_CGROUP_DEVICE)
-      run: |
-        set -e
-        python3 .github/scripts/ksu_devcg_patch.py
-        echo "--- verification: symbols present ---"
-        grep -c "BPF_PROG_TYPE_CGROUP_DEVICE" include/uapi/linux/bpf.h
-        grep -n "__cgroup_bpf_check_dev_permission" include/linux/bpf-cgroup.h kernel/bpf/cgroup.c | head
-        grep -n "BPF_CGROUP_RUN_PROG_DEVICE_CGROUP" include/linux/bpf-cgroup.h security/device_cgroup.c | head
-        grep -n "case BPF_CGROUP_DEVICE" kernel/bpf/syscall.c
-        grep -n "cg_dev_verifier_ops" kernel/bpf/cgroup.c
-
     - name: Build Kernel
       run: |
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
@@ -162,16 +157,16 @@ jobs:
 
     - name: Pack boot image
       run: |
-        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF4"
+        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF5"
         tools/mkbootimg --kernel out/arch/arm64/boot/Image.gz --base 0x0 \
           --cmdline "$CMDLINE" \
           --tags_offset 0x07A00000 --kernel_offset 0x00080000 --ramdisk_offset 0x07C00000 \
           --header_version 1 --os_version 9 --os_patch_level 2020-01-01 \
-          --output Kirin970_Ravel_KSU_PERF4-${{ steps.get_time.outputs.TIME }}.img
+          --output Kirin970_Ravel_KSU_PERF5-${{ steps.get_time.outputs.TIME }}.img
         ls -l *.img
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: Kirin970_Ravel_KSU_PERF4-${{ steps.get_time.outputs.TIME }}
-        path: "Kirin970_Ravel_KSU_PERF4-*.img"
+        name: Kirin970_Ravel_KSU_PERF5-${{ steps.get_time.outputs.TIME }}
+        path: "Kirin970_Ravel_KSU_PERF5-*.img"
