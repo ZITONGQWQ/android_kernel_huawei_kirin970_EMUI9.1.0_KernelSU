@@ -67,22 +67,17 @@ jobs:
         sed -i 's/^# CONFIG_CRYPTO_ZSTD is not set/CONFIG_CRYPTO_ZSTD=y/' $DC
         grep -q '^CONFIG_CRYPTO_ZSTD=y' $DC || echo 'CONFIG_CRYPTO_ZSTD=y' >> $DC
         grep -q '^CONFIG_KSM=y' $DC || echo 'CONFIG_KSM=y' >> $DC
-        echo '--- perf5: JUMP_LABEL / HZ1000 / LZ4HC / 842 ---'
-        sed -i 's/^# CONFIG_JUMP_LABEL is not set/CONFIG_JUMP_LABEL=y/' $DC
-        grep -q '^CONFIG_JUMP_LABEL=y' $DC || echo 'CONFIG_JUMP_LABEL=y' >> $DC
-        sed -i 's/^CONFIG_HZ_250=y/# CONFIG_HZ_250 is not set/' $DC
-        sed -i 's/^# CONFIG_HZ_1000 is not set/CONFIG_HZ_1000=y/' $DC
-        grep -q '^CONFIG_HZ_1000=y' $DC || echo 'CONFIG_HZ_1000=y' >> $DC
-        sed -i 's/^CONFIG_HZ=250/CONFIG_HZ=1000/' $DC
+        echo '--- perf6: LZ4HC / 842 / LZ4KD / no DEBUG_INFO ---'
         sed -i 's/^# CONFIG_CRYPTO_LZ4HC is not set/CONFIG_CRYPTO_LZ4HC=y/' $DC
         grep -q '^CONFIG_CRYPTO_LZ4HC=y' $DC || echo 'CONFIG_CRYPTO_LZ4HC=y' >> $DC
         sed -i 's/^# CONFIG_CRYPTO_842 is not set/CONFIG_CRYPTO_842=y/' $DC
         grep -q '^CONFIG_CRYPTO_842=y' $DC || echo 'CONFIG_CRYPTO_842=y' >> $DC
+        sed -i 's/^# CONFIG_CRYPTO_LZ4KD is not set/CONFIG_CRYPTO_LZ4KD=y/' $DC
+        grep -q '^CONFIG_CRYPTO_LZ4KD=y' $DC || echo 'CONFIG_CRYPTO_LZ4KD=y' >> $DC
         sed -i 's/^CONFIG_DEBUG_INFO=y/# CONFIG_DEBUG_INFO is not set/' $DC
-        echo '--- verify perf5 ---'
-        grep -E 'CONFIG_JUMP_LABEL|CONFIG_HZ|CONFIG_CRYPTO_LZ4HC|CONFIG_CRYPTO_842|CONFIG_DEBUG_INFO=' $DC
+        sed -i 's/^# CONFIG_JUMP_LABEL.*/# CONFIG_JUMP_LABEL is not set/' $DC
         echo '--- verify ---'
-        grep -E 'TCP_CONG_BBR|DEFAULT_TCP_CONG|NET_SCH_FQ|CRYPTO_ZSTD|^CONFIG_KSM' $DC
+        grep -E 'TCP_CONG_BBR|DEFAULT_TCP_CONG|NET_SCH_FQ|CRYPTO_ZSTD|CRYPTO_LZ4|CRYPTO_842|^CONFIG_KSM|JUMP_LABEL' $DC
         tail -12 $DC
 
     - name: Strip legacy KSU 0.9.5 hook call sites
@@ -146,6 +141,15 @@ jobs:
             if 'CONFIG_IS_HW_HISI' in line and line.startswith('#'):
                 print(i, line)
         PYEOF
+    - name: Backport LZ4KDR zram backend
+      run: |
+        set -e
+        python3 .github/scripts/ksu_lz4kd_patch.py
+        echo '--- verification ---'
+        grep -n 'LZ4KDR_COMPRESS' lib/Kconfig
+        grep -n 'CRYPTO_LZ4KD' crypto/Kconfig crypto/Makefile
+        grep -n 'lz4kd' lib/Makefile drivers/block/zram/zcomp.c
+        ls -l lib/lz4kd/ include/linux/lz4kdr.h crypto/lz4kd.c
     - name: Build Kernel
       run: |
         export PATH=$(pwd)/aarch64-linux-android-4.9/bin/:$PATH
@@ -157,16 +161,16 @@ jobs:
 
     - name: Pack boot image
       run: |
-        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF5"
+        CMDLINE="loglevel=4 initcall_debug=n page_tracker=on unmovable_isolate1=2:192M,3:224M,4:256M printktimer=0xfff0a000,0x534,0x538 androidboot.selinux=enforcing buildvariant=user maxcpus=8 androidboot.mgtest=PERF6"
         tools/mkbootimg --kernel out/arch/arm64/boot/Image.gz --base 0x0 \
           --cmdline "$CMDLINE" \
           --tags_offset 0x07A00000 --kernel_offset 0x00080000 --ramdisk_offset 0x07C00000 \
           --header_version 1 --os_version 9 --os_patch_level 2020-01-01 \
-          --output Kirin970_Ravel_KSU_PERF5-${{ steps.get_time.outputs.TIME }}.img
+          --output Kirin970_Ravel_KSU_PERF6-${{ steps.get_time.outputs.TIME }}.img
         ls -l *.img
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
-        name: Kirin970_Ravel_KSU_PERF5-${{ steps.get_time.outputs.TIME }}
-        path: "Kirin970_Ravel_KSU_PERF5-*.img"
+        name: Kirin970_Ravel_KSU_PERF6-${{ steps.get_time.outputs.TIME }}
+        path: "Kirin970_Ravel_KSU_PERF6-*.img"
